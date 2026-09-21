@@ -9,10 +9,17 @@ Total Marks: 20
 ## Submission Rules
 
 1. Submit the solution for any one set from Set A to Set F.
-2. Add a `SET.txt` file in the repository root containing only one letter: `A`, `B`, `C`, `D`, `E`, or `F`.
-3. Keep all PHP solution files in the repository. You may use one file or multiple files.
-4. Do not edit files inside `.github/`. The GitHub Actions workflow validates submissions and rejects workflow or validator changes.
-5. A successful push means the action detected the submitted set, linted the PHP files, and found the required features for that set.
+2. Create one folder using your roll number with underscores instead of slashes. Example: `PG_04_MCA_2025_001`.
+3. Keep all PHP solution files inside your own roll-number folder. Root-level PHP files are not accepted.
+4. You may add a `SET.txt` file inside your roll-number folder containing only one letter: `A`, `B`, `C`, `D`, `E`, or `F`. If it is not present, the workflow will use the root `SET.txt` or infer the set from your code.
+5. Do not edit or delete `.github/`, `README.md`, or the root `SET.txt`. The GitHub Actions workflow rejects protected-file changes.
+6. A successful push means the action detected your roll-number folder, linted the PHP files inside it, detected the selected set, and found the required features for that set.
+
+## Allowed Roll Number Folders
+
+Only the following folders are accepted:
+
+`PG_04_MCA_2025_001`, `PG_04_MCA_2025_002`, `PG_04_MCA_2025_003`, `PG_04_MCA_2025_004`, `PG_04_MCA_2025_005`, `PG_04_MCA_2025_007`, `PG_04_MCA_2025_008`, `PG_04_MCA_2025_009`, `PG_04_MCA_2025_011`, `PG_04_MCA_2025_013`, `PG_04_MCA_2025_014`, `PG_04_MCA_2025_016`, `PG_04_MCA_2025_017`, `PG_04_MCA_2025_018`, `PG_04_MCA_2025_019`, `PG_04_MCA_2025_020`, `PG_04_MCA_2025_021`, `PG_04_MCA_2025_022`, `PG_04_MCA_2025_023`, `PG_04_MCA_2025_025`, `PG_04_MCA_2025_026`, `PG_04_MCA_2025_027`, `PG_04_MCA_2025_028`, `PG_04_MCA_2025_031`, `PG_04_MCA_2025_033`, `PG_04_MCA_2025_034`, `PG_04_MCA_2025_035`, `PG_04_MCA_2025_036`, `PG_04_MCA_2025_037`, `PG_04_MCA_2025_040`, `PG_04_MCA_2025_041`, `PG_04_MCA_2025_042`, `PG_04_MCA_2025_043`, `PG_04_MCA_2025_044`, `PG_04_MCA_2025_045`, `PG_04_MCA_2025_046`, `PG_04_MCA_2025_047`, `PG_04_MCA_2025_048`, `PG_04_MCA_2025_049`, `PG_04_MCA_2025_050`, `PG_04_MCA_2025_051`, `PG_04_MCA_2025_052`, `PG_04_MCA_2025_053`, `PG_04_MCA_2025_054`, `PG_04_MCA_2025_055`, `PG_04_MCA_2025_056`, `PG_04_MCA_2025_057`, `PG_04_MCA_2025_058`, `PG_04_MCA_2025_059`, `PG_04_MCA_2025_060`
 
 ## Set A
 
@@ -168,4 +175,3 @@ After successful login:
 - Display "Eligible for Examination" if attendance is 75% or above.
 - Otherwise display "Not Eligible for Examination".
 - Provide a logout option that destroys the session.
-

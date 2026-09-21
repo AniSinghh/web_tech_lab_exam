@@ -14,8 +14,65 @@ ROOT = Path(__file__).resolve().parents[2]
 PROTECTED_PATHS = {
     ".github/workflows/validate.yml",
     ".github/scripts/validate_submission.py",
+    "README.md",
+    "SET.txt",
 }
+PROTECTED_PREFIXES = (".github/",)
 IGNORED_DIRS = {".git", "vendor", "node_modules"}
+ROOT_ALLOWED_FILES = {".gitignore", "README.md", "SET.txt"}
+ROOT_ALLOWED_DIRS = {".github"}
+ALLOWED_ROLL_FOLDERS = {
+    "PG_04_MCA_2025_001",
+    "PG_04_MCA_2025_002",
+    "PG_04_MCA_2025_003",
+    "PG_04_MCA_2025_004",
+    "PG_04_MCA_2025_005",
+    "PG_04_MCA_2025_007",
+    "PG_04_MCA_2025_008",
+    "PG_04_MCA_2025_009",
+    "PG_04_MCA_2025_011",
+    "PG_04_MCA_2025_013",
+    "PG_04_MCA_2025_014",
+    "PG_04_MCA_2025_016",
+    "PG_04_MCA_2025_017",
+    "PG_04_MCA_2025_018",
+    "PG_04_MCA_2025_019",
+    "PG_04_MCA_2025_020",
+    "PG_04_MCA_2025_021",
+    "PG_04_MCA_2025_022",
+    "PG_04_MCA_2025_023",
+    "PG_04_MCA_2025_025",
+    "PG_04_MCA_2025_026",
+    "PG_04_MCA_2025_027",
+    "PG_04_MCA_2025_028",
+    "PG_04_MCA_2025_031",
+    "PG_04_MCA_2025_033",
+    "PG_04_MCA_2025_034",
+    "PG_04_MCA_2025_035",
+    "PG_04_MCA_2025_036",
+    "PG_04_MCA_2025_037",
+    "PG_04_MCA_2025_040",
+    "PG_04_MCA_2025_041",
+    "PG_04_MCA_2025_042",
+    "PG_04_MCA_2025_043",
+    "PG_04_MCA_2025_044",
+    "PG_04_MCA_2025_045",
+    "PG_04_MCA_2025_046",
+    "PG_04_MCA_2025_047",
+    "PG_04_MCA_2025_048",
+    "PG_04_MCA_2025_049",
+    "PG_04_MCA_2025_050",
+    "PG_04_MCA_2025_051",
+    "PG_04_MCA_2025_052",
+    "PG_04_MCA_2025_053",
+    "PG_04_MCA_2025_054",
+    "PG_04_MCA_2025_055",
+    "PG_04_MCA_2025_056",
+    "PG_04_MCA_2025_057",
+    "PG_04_MCA_2025_058",
+    "PG_04_MCA_2025_059",
+    "PG_04_MCA_2025_060",
+}
 
 
 def fail(message: str) -> None:
@@ -59,22 +116,123 @@ def changed_files() -> set[str]:
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
 
+def changed_file_statuses() -> list[tuple[str, str]]:
+    allow = os.environ.get("ALLOW_PROTECTED_CHANGES", "false").lower() == "true"
+    if allow:
+        return []
+
+    event = os.environ.get("GITHUB_EVENT_NAME", "")
+    base_ref = os.environ.get("GITHUB_BASE_REF", "")
+    before = os.environ.get("GITHUB_EVENT_BEFORE", "")
+    sha = os.environ.get("GITHUB_SHA", "HEAD")
+
+    if event == "pull_request" and base_ref:
+        run(["git", "fetch", "origin", base_ref, "--depth=1"])
+        diff_range = f"origin/{base_ref}...HEAD"
+    elif before and not re.fullmatch(r"0+", before):
+        diff_range = f"{before}..{sha}"
+    else:
+        return []
+
+    result = run(["git", "diff", "--name-status", diff_range])
+    if result.returncode != 0:
+        print(result.stdout)
+        return []
+
+    statuses: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            statuses.append((parts[0], parts[-1]))
+    return statuses
+
+
 def enforce_protected_files() -> None:
-    touched = changed_files() & PROTECTED_PATHS
+    changed = changed_files()
+    touched = (changed & PROTECTED_PATHS) | {
+        path for path in changed if path.startswith(PROTECTED_PREFIXES)
+    }
     if touched:
         fail(
-            "Do not modify validation workflow files: "
+            "Do not modify protected exam files: "
             + ", ".join(sorted(touched))
         )
 
+    deleted = {path for status, path in changed_file_statuses() if "D" in status}
+    deleted_protected = (deleted & PROTECTED_PATHS) | {
+        path for path in deleted if path.startswith(PROTECTED_PREFIXES)
+    }
+    if deleted_protected:
+        fail(
+            "Do not delete protected exam files: "
+            + ", ".join(sorted(deleted_protected))
+        )
 
-def php_files() -> list[Path]:
+    for protected in PROTECTED_PATHS:
+        if not (ROOT / protected).exists():
+            fail(f"Protected exam file is missing: {protected}")
+
+
+def enforce_repository_shape() -> None:
+    bad_entries: list[str] = []
+    result = run(["git", "ls-files"])
+    if result.returncode != 0:
+        print(result.stdout)
+        fail("Unable to inspect tracked repository files")
+
+    for raw_path in result.stdout.splitlines():
+        if not raw_path:
+            continue
+        first = raw_path.split("/", 1)[0]
+        if "/" not in raw_path and first not in ROOT_ALLOWED_FILES:
+            bad_entries.append(raw_path)
+        if "/" in raw_path and first not in ROOT_ALLOWED_DIRS and first not in ALLOWED_ROLL_FOLDERS:
+            bad_entries.append(first + "/")
+
+    if bad_entries:
+        fail(
+            "Only protected root files and allowed roll-number folders are permitted. "
+            "Invalid root entries: " + ", ".join(sorted(set(bad_entries)))
+        )
+
+
+def roll_folder_for(path: Path) -> str | None:
+    relative = path.relative_to(ROOT)
+    if not relative.parts:
+        return None
+    first = relative.parts[0]
+    if first in ALLOWED_ROLL_FOLDERS:
+        return first
+    return None
+
+
+def changed_roll_folders() -> set[str]:
+    folders: set[str] = set()
+    changed = changed_files()
+    for raw_path in changed:
+        first = raw_path.split("/", 1)[0]
+        if first in ALLOWED_ROLL_FOLDERS:
+            folders.add(first)
+    return folders
+
+
+def php_files(folder: str | None = None) -> list[Path]:
     files: list[Path] = []
-    for path in ROOT.rglob("*.php"):
+    search_root = ROOT / folder if folder else ROOT
+    for path in search_root.rglob("*.php"):
         if any(part in IGNORED_DIRS for part in path.relative_to(ROOT).parts):
             continue
         files.append(path)
     return sorted(files)
+
+
+def enforce_php_locations(files: list[Path]) -> None:
+    invalid = [str(path.relative_to(ROOT)) for path in files if roll_folder_for(path) is None]
+    if invalid:
+        fail(
+            "All PHP files must be inside an allowed roll-number folder. "
+            "Invalid PHP file locations: " + ", ".join(invalid)
+        )
 
 
 def lint_php(files: list[Path]) -> None:
@@ -204,11 +362,14 @@ VALIDATORS = {
 }
 
 
-def selected_set(text: str) -> str:
+def selected_set(text: str, folder: str) -> str:
     declared = os.environ.get("QUESTION_SET", "").strip().upper()
-    set_file = ROOT / "SET.txt"
+    set_file = ROOT / folder / "SET.txt"
     if not declared and set_file.exists():
         declared = set_file.read_text(encoding="utf-8", errors="ignore").strip().upper()
+    root_set_file = ROOT / "SET.txt"
+    if not declared and root_set_file.exists():
+        declared = root_set_file.read_text(encoding="utf-8", errors="ignore").strip().upper()
     if declared in VALIDATORS:
         return declared
     if declared:
@@ -224,28 +385,48 @@ def selected_set(text: str) -> str:
 
 def main() -> None:
     enforce_protected_files()
+    enforce_repository_shape()
 
-    files = php_files()
-    if not files:
+    all_php_files = php_files()
+    enforce_php_locations(all_php_files)
+
+    folders = changed_roll_folders()
+    if not folders:
+        folders = {roll_folder_for(path) for path in all_php_files if roll_folder_for(path)}
+    folders = {folder for folder in folders if folder}
+
+    if not folders:
+        fail(
+            "Create a folder using your roll number with underscores, for example "
+            "PG_04_MCA_2025_001, and place your PHP code inside it."
+        )
+
+    for folder in sorted(folders):
+        files = php_files(folder)
+        if not files:
+            fail(f"No PHP files found inside {folder}. Add your solution files there before pushing.")
+
+        lint_php(files)
+        text = combined_source(files)
+        set_name = selected_set(text, folder)
+        errors = VALIDATORS[set_name](text)
+
+        print(f"Roll folder checked: {folder}")
+        print(f"Detected/selected question set: {set_name}")
+        print("PHP files checked:")
+        for path in files:
+            print(f"- {path.relative_to(ROOT)}")
+
+        if errors:
+            print("\nMissing requirements:")
+            for error in errors:
+                print(f"- {error}")
+            fail(f"Submission in {folder} does not satisfy Set {set_name}")
+
+    if not all_php_files:
         fail("No PHP files found. Add your solution files before pushing.")
 
-    lint_php(files)
-    text = combined_source(files)
-    set_name = selected_set(text)
-    errors = VALIDATORS[set_name](text)
-
-    print(f"Detected/selected question set: {set_name}")
-    print("PHP files checked:")
-    for path in files:
-        print(f"- {path.relative_to(ROOT)}")
-
-    if errors:
-        print("\nMissing requirements:")
-        for error in errors:
-            print(f"- {error}")
-        fail(f"Submission does not satisfy Set {set_name}")
-
-    print(f"Submission satisfies the automated checks for Set {set_name}.")
+    print("Submission satisfies the automated checks.")
 
 
 if __name__ == "__main__":
