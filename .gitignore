@@ -1,4 +1,5 @@
 .DS_Store
+questions/
 vendor/
 node_modules/
 __pycache__/
